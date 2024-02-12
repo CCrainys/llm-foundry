@@ -96,6 +96,7 @@ def validate_config(cfg: DictConfig):
     if (cfg.model.get('fc_type', 'torch') == 'te' or
             'te' in cfg.model.get('ffn_config', {}).get('ffn_type', 'mptmlp')):
         fsdp_config = cfg.get('fsdp_config', None)
+        deepspeed_config = cfg.get('deepspeed_config', None)
         act_ckpt = fsdp_config.get('activation_checkpointing', False)
         act_ckpt_reentrant = fsdp_config.get(
             'activation_checkpointing_reentrant', True)
@@ -200,6 +201,14 @@ def main(cfg: DictConfig) -> Trainer:
                                                        must_exist=False,
                                                        default_value=None,
                                                        convert=True)
+
+    # Optional fsdp data, fine-tuning, and eval configs
+    deepspeed_config: Optional[Dict[str, Any]] = pop_config(cfg,
+                                                       'deepspeed_config',
+                                                       must_exist=False,
+                                                       default_value=None,
+                                                       convert=True)
+
     eval_loader_config: Optional[Union[DictConfig, ListConfig]] = pop_config(
         cfg, 'eval_loader', must_exist=False, default_value=None)
     icl_tasks_config: Optional[Union[ListConfig,
@@ -212,6 +221,15 @@ def main(cfg: DictConfig) -> Trainer:
                                                             'eval_gauntlet',
                                                             must_exist=False,
                                                             default_value=None)
+    if eval_gauntlet_config is None:
+        eval_gauntlet_config = pop_config(cfg,
+                                          'model_gauntlet',
+                                          must_exist=False,
+                                          default_value=None)
+        if eval_gauntlet_config is not None:
+            warnings.warn(
+                'Use of the key `model_gauntlet` is deprecated, please use the key `eval_gauntlet`',
+                DeprecationWarning)
     icl_subset_num_batches: Optional[int] = pop_config(cfg,
                                                        'icl_subset_num_batches',
                                                        must_exist=False,
@@ -560,6 +578,7 @@ def main(cfg: DictConfig) -> Trainer:
         algorithms=algorithms,
         device_train_microbatch_size=device_train_microbatch_size,
         fsdp_config=fsdp_config,
+        deepspeed_config=deepspeed_config,
         save_folder=save_folder,
         save_filename=save_filename,
         save_latest_filename=save_latest_filename,
